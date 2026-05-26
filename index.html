@@ -195,7 +195,10 @@ main { max-width: 900px; margin: 20px auto; padding: 0 16px; }
   </select>
   <button class="primary" onclick="shuffleCards()">随机打乱</button>
   <button class="mode-btn" id="mode-toggle" onclick="toggleMode()">中→英</button>
-	  <button class="danger" onclick="resetProgress()">重置进度</button>
+	  <button onclick="exportProgress()">导出进度</button>
+ <button onclick="document.getElementById('import-file').click()">导入进度</button>
+ <input type="file" id="import-file" accept=".json" style="display:none" onchange="importProgress(event)">
+ <button class="danger" onclick="resetProgress()">重置进度</button>
 </div>
 
 <main>
@@ -467,6 +470,41 @@ function resetProgress() {
     shuffleCards();
     showToast('进度已重置');
   }
+}
+
+// ── Export/Import ──
+function exportProgress() {
+  var data = { date: new Date().toISOString(), total: WORDS.length, known: Array.from(knownSet), knownCount: knownSet.size };
+  var blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ielts_vocab_progress.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('已导出 ' + knownSet.size + ' 个标记');
+}
+
+function importProgress(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      if (!Array.isArray(data.known)) { showToast('文件格式错误'); return; }
+      var added = 0, skipped = 0;
+      data.known.forEach(function(i) {
+        if (i >= 0 && i < WORDS.length) { knownSet.add(i); added++; }
+        else { skipped++; }
+      });
+      saveKnown(knownSet);
+      applyFilters();
+      shuffleCards();
+      showToast('已导入 ' + added + ' 个标记' + (skipped > 0 ? '，跳过 ' + skipped + ' 个无效' : ''));
+    } catch(err) { showToast('文件解析失败'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
 // ── Toast ──
