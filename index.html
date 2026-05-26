@@ -197,7 +197,10 @@ main { max-width: 900px; margin: 20px auto; padding: 0 16px; }
   </select>
   <button class="primary" onclick="shuffleCards()">随机打乱</button>
   <button class="mode-btn" id="mode-toggle" onclick="toggleMode()">中→英</button>
-	  <button class="danger" onclick="resetProgress()">重置进度</button>
+	  <button onclick="exportProgress()">导出进度</button>
+  <button onclick="document.getElementById('import-file').click()">导入进度</button>
+  <input type="file" id="import-file" accept=".json" style="display:none" onchange="importProgress(event)">
+  <button class="danger" onclick="resetProgress()">重置进度</button>
 </div>
 
 <main>
@@ -478,6 +481,43 @@ function resetProgress() {
     shuffleCards();
     showToast('进度已重置');
   }
+}
+
+// ── Export/Import ──
+function exportProgress() {
+  const data = { date: new Date().toISOString(), total: WORDS.length, known: [...knownSet], knownCount: knownSet.size };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ielts_vocab_progress.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('进度已导出 (' + knownSet.size + ' 个已掌握)');
+}
+
+function importProgress(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data.known)) { showToast('文件格式错误'); return; }
+      const newKnown = new Set(data.known);
+      // Verify indices are valid
+      let valid = 0, invalid = 0;
+      for (const i of newKnown) {
+        if (i >= 0 && i < WORDS.length) { knownSet.add(i); valid++; }
+        else { invalid++; }
+      }
+      saveKnown(knownSet);
+      applyFilters();
+      shuffleCards();
+      showToast('已导入 ' + valid + ' 个标记' + (invalid > 0 ? '，跳过 ' + invalid + ' 个无效' : ''));
+    } catch { showToast('文件解析失败'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
 // ── Toast ──
